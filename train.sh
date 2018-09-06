@@ -1,1 +1,1 @@
-python3 main.py --phase train
+python main.py --phase train

@@ -8,7 +8,7 @@ def log2(_input):
     denominator = tf.log(tf.constant(2, dtype=numerator.dtype))
     return numerator / denominator
 
-def dropout(_input ,prob):
+def dropout(_input , prob = 0.5):
     return tf.nn.dropout(_input,prob)
 
 def lrelu(_input, leak = 0.2):
@@ -18,7 +18,7 @@ def lrelu(_input, leak = 0.2):
 
 
 def relu(_input):
-    relu = tf.nn.relu(input)
+    relu = tf.nn.relu(_input)
     
     nan_to_zero = tf.where(tf.equal(relu, relu), relu, tf.zeros_like(relu))
     return nan_to_zero

@@ -28,10 +28,10 @@ class pix2pix(object):
         self.log_path = args.log_path
         self.sample_path = args.sample_path
         self.test_path = args.test_path
-        self.lr = args.lr
+        self.lr = args.init_lr
         
         self.print_freq = args.print_freq
-        self.save_freq = arge.save_freq
+        self.save_freq = args.save_freq
         
         self.beta = args.beta
         
@@ -41,10 +41,10 @@ class pix2pix(object):
         self.dir = args.trans_dir
         self.phase = args.phase
         
-        self.gfdim = gdfim
+        self.gfdim = gfdim
         self.dfdim = dfdim
         
-        self.out_size = img_size
+        self.out_size = args.load_size
         self.isTrain = True if self.phase =='train' else False
         self.norm_method = args.norm_method
         
@@ -59,8 +59,9 @@ class pix2pix(object):
         
         self.paired = args.paired
         
+        self.is_build = False
         
-        self.build()
+        #self.build()
         
     def build(self):
         
@@ -75,13 +76,14 @@ class pix2pix(object):
             self.realB = self.real_pair[:,:,:, self.in_dim:self.in_dim+self.out_dim ]
             self.realA = self.real_pair[:,:,:, :self.in_dim]
         
-        
+        #print('a')
         
         if self.ur == 'u':
             self.generator = self.generator_unet
         else:
             self.generator = self.generator_resnet
         
+        #print('b')
         self.fakeB =  self.generator(self.realA , reuse = False)
     
         
@@ -90,26 +92,26 @@ class pix2pix(object):
         self.d_real , self.d_real_logits = self.discriminator(self.real_pair , patch_size = 32 , reuse=False)
         self.d_fake , self.d_fake_logits = self.discriminator(self.fake_pair , patch_size = 32 , reuse=True)
         
-        self.d_loss_real = tf.reduce_sum( tf.nn.sigmoid_cross_entropy_with_logits(logits = self.d_real_logits , label = tf.ones_like(self.d_real) )  )
-        self.d_loss_fake = tf.reduce_sum( tf.nn.sigmoid_cross_entropy_with_logits(logits = self.d_fake_logits , label = tf.zeros_like(self.d_fake) )  )
+        self.d_loss_real = tf.reduce_sum( tf.nn.sigmoid_cross_entropy_with_logits(logits = self.d_real_logits , labels = tf.ones_like(self.d_real) )  )
+        self.d_loss_fake = tf.reduce_sum( tf.nn.sigmoid_cross_entropy_with_logits(logits = self.d_fake_logits , labels = tf.zeros_like(self.d_fake) )  )
         
         self.d_loss = self.d_loss_real + self.d_loss_fake
         
         self.g_loss = self.mae_weight * tf.reduce_mean( tf.abs(self.fakeB - self.realB))  \
-        + self.gan_weight * tf.reduce_mean( tf.nn.sigmoid_cross_entropy_with_logits(logits= self.d_fake_logits , label= tf.ones_like(self.d_fake) ) )
+        + self.gan_weight * tf.reduce_mean( tf.nn.sigmoid_cross_entropy_with_logits(logits= self.d_fake_logits , labels= tf.ones_like(self.d_fake) ) )
         
         self.g_sums = []
         self.d_sums  = []
         
-        self.g_loss_sum = tf.summary.scalar( name = 'g_loss' , self.g_loss)
-        self.d_loss_sum = tf.summary.scalar( name = 'd_loss' , self.d_loss)
+        self.g_loss_sum = tf.summary.scalar('g_loss' , self.g_loss)
+        self.d_loss_sum = tf.summary.scalar( 'd_loss' , self.d_loss)
         
         self.d_loss_real_sum = tf.summary.scalar("d_loss_real", self.d_loss_real)
         self.d_loss_fake_sum = tf.summary.scalar("d_loss_fake", self.d_loss_fake)
         
-        self.fake_b_image = tf.summary.image(name = 'fake_image' , self.fakeB)
-        self.d_real_sum = tf.summary.histogram(name = 'd real summary' , self.d_real_logits )
-        self.d_fake_sum = tf.summary.histogram(name = 'd fake summary' , self.d_fake_logits )
+        self.fake_b_image = tf.summary.image('fake_image' , self.fakeB)
+        self.d_real_sum = tf.summary.histogram( 'd real summary' , self.d_real_logits )
+        self.d_fake_sum = tf.summary.histogram( 'd fake summary' , self.d_fake_logits )
         
         self.g_sums.append(self.g_loss_sum) 
         self.g_sums.append(self.d_loss_fake_sum)
@@ -130,12 +132,15 @@ class pix2pix(object):
         self.g_vars = [ var for var in tf_vars if 'generator' in var.name ]
         self.d_vars = [ var for var in tf_vars if 'discriminator' in var.name]
         
+        self.is_build = True
         
     
         
     def generator_unet(self , input_img , reuse =False):
         
-        assert self.ds_time_unet > 1
+        assert self.en_time_unet > 1
+        
+        #print('YOOOOO')
         
         with tf.variable_scope('generator'):
             
@@ -173,7 +178,7 @@ class pix2pix(object):
                 
             dec = enc
             
-            if deconv:
+            if self.deconv:
                 
                 batch_size = tf.shape(dec)[0]
                 fdim = self.dfdim
@@ -181,72 +186,72 @@ class pix2pix(object):
                 dec = self.norm_layer(deconv2d(relu(dec), [ batch_size, sl[6], sl[6], fdim*8] , name = 'g_d0_conv') , is_train = self.isTrain, name = 'g_d0_bn')
                 dec = dropout(dec)
                 decs.append(dec)
-                dec = tf.concat( [dec , encs[6]] , asix = -1 )
+                dec = tf.concat( [dec , encs[6]] , axis = -1 )
             
                 dec = self.norm_layer(deconv2d(relu(dec), [batch_size , sl[5], sl[5], fdim*8] , name = 'g_d1_conv') , is_train = self.isTrain, name = 'g_d1_bn')
                 dec = dropout(dec)
                 decs.append(dec)
-                dec = tf.concat( [dec , encs[5]] , asix = -1 )
+                dec = tf.concat( [dec , encs[5]] , axis= -1 )
                 
                 dec = self.norm_layer(deconv2d(relu(dec), [batch_size, sl[4], sl[4], fdim*8] , name = 'g_d2_conv') , is_train = self.isTrain, name = 'g_d2_bn')
                 dec = dropout(dec)
                 decs.append(dec)
-                dec = tf.concat( [dec , encs[4]] , asix = -1 )
+                dec = tf.concat( [dec , encs[4]] , axis = -1 )
                 
                 # without dropout
                 
                 dec = self.norm_layer(deconv2d(relu(dec), [batch_size, sl[3], sl[3], fdim*8] , name = 'g_d3_conv') , is_train = self.isTrain, name = 'g_d3_bn')
                 decs.append(dec)
-                dec = tf.concat( [dec , encs[3]] , asix = -1 )
+                dec = tf.concat( [dec , encs[3]] , axis = -1 )
                 
                 dec = self.norm_layer(deconv2d(relu(dec), [batch_size, sl[2], sl[2], fdim*4] , name = 'g_d4_conv') , is_train = self.isTrain, name = 'g_d4_bn')
                 decs.append(dec)
-                dec = tf.concat( [dec , encs[2]] , asix = -1 )
+                dec = tf.concat( [dec , encs[2]] , axis = -1 )
                 
                 dec = self.norm_layer(deconv2d(relu(dec), [batch_size, sl[1], sl[1], fdim*2] , name = 'g_d5_conv') , is_train = self.isTrain, name = 'g_d5_bn')
                 decs.append(dec)
-                dec = tf.concat( [dec , encs[1]] , asix = -1 )
+                dec = tf.concat( [dec , encs[1]] , axis= -1 )
                 
                 dec = self.norm_layer(deconv2d(relu(dec), [batch_size, sl[0], sl[0], fdim*1] , name = 'g_d6_conv') , is_train = self.isTrain, name = 'g_d6_bn')
                 decs.append(dec)
-                dec = tf.concat( [dec , encs[0]] , asix = -1 )
+                dec = tf.concat( [dec , encs[0]] , axis = -1 )
                 
-                dec = deconv2d(relu(dec), [batch_size, self.img_size, self.img_size, self.out_dim], name = 'g_d7_conv' , is_train = self.isTrain) 
+                dec = deconv2d( relu(dec), [batch_size, self.img_size, self.img_size, self.out_dim], name = 'g_d7_conv') 
                 decs.append(dec)
                
             else:
                 dec = self.norm_layer(deconv2d_resize(relu(dec),fdim*8 , name = 'g_d0_conv') , is_train = self.isTrain, name = 'g_d0_bn')
                 dec = dropout(dec)
                 decs.append(dec)
-                dec = tf.concat( [dec , encs[6]] , asix = -1 )
+                dec = tf.concat( [dec , encs[6]] , axis = -1 )
             
                 dec = self.norm_layer(deconv2d_resize(relu(dec),fdim *8 , name = 'g_d1_conv') , is_train = self.isTrain, name = 'g_d1_bn')
                 dec = dropout(dec)
                 decs.append(dec)
-                dec = tf.concat( [dec , encs[5]] , asix = -1 )
+                dec = tf.concat( [dec , encs[5]] , axis = -1 )
                 
                 dec = self.norm_layer(deconv2d_resize(relu(dec),fdim *8, name = 'g_d2_conv') , is_train = self.isTrain, name = 'g_d2_bn')
                 dec = dropout(dec)
                 decs.append(dec)
-                dec = tf.concat( [dec , encs[4]] , asix = -1 )
+                dec = tf.concat( [dec , encs[4]] , axis = -1 )
                 
                 # without dropout
                 
                 dec = self.norm_layer(deconv2d_resize(relu(dec),fdim *8, name = 'g_d3_conv') , is_train = self.isTrain, name = 'g_d3_bn')
                 decs.append(dec)
-                dec = tf.concat( [dec , encs[3]] , asix = -1 )
+                dec = tf.concat( [dec , encs[3]] , axis = -1 )
                 
                 dec = self.norm_layer(deconv2d_resize(relu(dec),fdim  *4, name = 'g_d4_conv') , is_train = self.isTrain, name = 'g_d4_bn')
                 decs.append(dec)
-                dec = tf.concat( [dec , encs[2]] , asix = -1 )
+                dec = tf.concat( [dec , encs[2]] , axis= -1 )
                 
                 dec = self.norm_layer(deconv2d_resize(relu(dec),fdim  *2, name = 'g_d5_conv') , is_train = self.isTrain, name = 'g_d5_bn')
                 decs.append(dec)
-                dec = tf.concat( [dec , encs[1]] , asix = -1 )
+                dec = tf.concat( [dec , encs[1]] , axis = -1 )
                 
                 dec = self.norm_layer(deconv2d_resize(relu(dec),fdim *1 , name = 'g_d6_conv') , is_train = self.isTrain, name = 'g_d6_bn')
                 decs.append(dec)
-                dec = tf.concat( [dec , encs[0]] , asix = -1 )
+                dec = tf.concat( [dec , encs[0]] , axis = -1 )
                 
                 dec = conv2d( relu(dec), self.out_dim , name = 'g_d7_conv') 
                 decs.append(dec)
@@ -298,7 +303,7 @@ class pix2pix(object):
         if ckpt and ckpt.model_checkpoint_path:
             
             ckpt_name = os.path.basename(ckpt.model_checkpoint_path)
-            self.saver.restore(self.sess, os.path.join(checkpoint_dir, ckpt_name))
+            self.saver.restore(self.sess, os.path.join( path , ckpt_name))
             return True
         else:
             return False
@@ -312,10 +317,12 @@ class pix2pix(object):
         #self.saver.save(self.sess , file_path )
         
     def train(self): # load all data once
+        
+        assert self.is_build
     
         d_opt = tf.train.AdamOptimizer(learning_rate = self.lr , beta1= self.beta)\
         .minimize(loss = self.d_loss , var_list=self.d_vars)
-        g_opt = tf.train.AdamOptimizer(learning_rate = sefl.lr , beta1 = self.beta )\
+        g_opt = tf.train.AdamOptimizer(learning_rate = self.lr , beta1 = self.beta )\
         .minimize(loss = self.g_loss , var_list=self.g_vars)
         
         
@@ -357,17 +364,17 @@ class pix2pix(object):
             for j in range( int( np.ceil(total_size//self.batch_size))  ):
                 
                 if self.paired:
-                    batch_names = train_names[j*self.batch_size:(j+1)*self.batch_size] if not j==(np.ceil(total_size//self.batch_size)-1)\
-                    else batch_names = train_names[j*self.batch_size:]
+                    batch_names = train_names[j*self.batch_size:(j+1)*self.batch_size] if not j==(np.ceil(total_size//self.batch_size)-1) \
+                    else train_names[j*self.batch_size:]
                     
                     input_imgs = loader.load_all_data_pair(batch_names , load_size = self.scale_size , crop_size = self.img_size , flip = self.flip)
 
                 else:
                     batch_in_names = train_in_names[j*self.batch_size:(j+1)*self.batch_size] if not j==(np.ceil(total_size//self.batch_size)-1)\
-                    else batch_in_names = train_in_names[j*self.batch_size:]
+                    else train_in_names[j*self.batch_size:]
                     
                     batch_out_names = train_out_names[j*self.batch_size:(j+1)*self.batch_size] if not j==(np.ceil(total_size//self.batch_size)-1)\
-                    else batch_out_names = train_out_names[j*self.batch_size:]
+                    else train_out_names[j*self.batch_size:]
                     
                     input_imgs = loader.load_all_data(batch_in_names, batch_out_names , load_size = self.scale_size , crop_size = self.img_size , flip = self.flip)
 
@@ -433,6 +440,9 @@ class pix2pix(object):
         print("[Sample] d_loss: {:.8f}, g_loss: {:.8f}".format(d_loss, g_loss))
     
     def test(self):
+        
+        assert self.is_build
+
         
         if self.paired:
             test_names = glob('./datasets/{}/test/*.jpg'.format(self.dataset))

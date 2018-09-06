@@ -58,7 +58,7 @@ def main(_):
    
     with tf.Session() as sess:
                
-        model = pix2pix(args,sess)
+        model = pix2pix(sess, args)
         model.build()
          
         if args.phase == 'train':
