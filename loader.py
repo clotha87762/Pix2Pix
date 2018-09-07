@@ -78,6 +78,7 @@ def load_all_data_pair(datas , load_size = 286 , crop_size = 256 , flip = True):
     imgs = []
     for name in datas:
         img = cv2.imread(name)
+        img =  img.astype(np.float32)
         imgs.append(preprocess_paired_img(img))
     
     return imgs

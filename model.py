@@ -7,7 +7,7 @@ import os
 import loader
 import sys
 from module import *
-
+import random
 
 
 class pix2pix(object):
@@ -60,6 +60,8 @@ class pix2pix(object):
         
         self.paired = args.paired
         
+        self.patch_size = args.patch
+        
         self.is_build = False
         
         #self.build()
@@ -90,8 +92,8 @@ class pix2pix(object):
         
         self.fake_pair = tf.concat( [self.fakeB, self.realA ] , axis = -1)
         
-        self.d_real , self.d_real_logits = self.discriminator(self.real_pair , patch_size = 32 , reuse=False)
-        self.d_fake , self.d_fake_logits = self.discriminator(self.fake_pair , patch_size = 32 , reuse=True)
+        self.d_real , self.d_real_logits = self.discriminator(self.real_pair , patch_size = self.patch_size , reuse=False)
+        self.d_fake , self.d_fake_logits = self.discriminator(self.fake_pair , patch_size = self.patch_size , reuse=True)
         
         self.d_loss_real = tf.reduce_mean( tf.nn.sigmoid_cross_entropy_with_logits(logits = self.d_real_logits , labels = tf.ones_like(self.d_real) )  )
         self.d_loss_fake = tf.reduce_mean( tf.nn.sigmoid_cross_entropy_with_logits(logits = self.d_fake_logits , labels = tf.zeros_like(self.d_fake) )  )
@@ -188,18 +190,18 @@ class pix2pix(object):
                 batch_size = tf.shape(dec)[0]
                 fdim = self.dfdim
                 
-                dec = self.norm_layer(deconv2d(relu(dec), [ batch_size, sl[6], sl[6], fdim*8] , name = 'g_d0_conv') , is_train = self.isTrain, name = 'g_d0_bn')
-                dec = dropout(dec)
+                dec = deconv2d(relu(dec), [ batch_size, sl[6], sl[6], fdim*8] , name = 'g_d0_conv')
+                dec = self.norm_layer( dropout(dec)  , is_train = self.isTrain, name = 'g_d0_bn')
                 decs.append(dec)
                 dec = tf.concat( [dec , encs[6]] , axis = -1 )
             
-                dec = self.norm_layer(deconv2d(relu(dec), [ batch_size , sl[5], sl[5], fdim*8] , name = 'g_d1_conv') , is_train = self.isTrain, name = 'g_d1_bn')
-                dec = dropout(dec)
+                dec = deconv2d(relu(dec), [ batch_size , sl[5], sl[5], fdim*8] , name = 'g_d1_conv')
+                dec = self.norm_layer( dropout(dec), is_train = self.isTrain, name = 'g_d1_bn')
                 decs.append(dec)
                 dec = tf.concat( [dec , encs[5]] , axis= -1 )
                 
-                dec = self.norm_layer(deconv2d(relu(dec), [ batch_size, sl[4], sl[4], fdim*8] , name = 'g_d2_conv') , is_train = self.isTrain, name = 'g_d2_bn')
-                dec = dropout(dec)
+                dec = deconv2d(relu(dec), [ batch_size, sl[4], sl[4], fdim*8] , name = 'g_d2_conv')
+                dec = self.norm_layer( dropout(dec)  , is_train = self.isTrain, name = 'g_d2_bn')
                 decs.append(dec)
                 dec = tf.concat( [dec , encs[4]] , axis = -1 )
                 
@@ -265,7 +267,48 @@ class pix2pix(object):
           
         
     def generator_resnet(self , input_img , reuse = False ):
-        raise NotImplementedError
+        with tf.variable_sope('generator'):
+            if reuse:
+                tf.get_variable_scope().reuse_variables()
+            else :
+                assert tf.get_variable_scope().reuse == False
+            
+            batch_size = tf.shape(input_img)[0]
+            
+            sl =[self.img_size , int(self.img_size/2) , int(self.img_size/4) , int(self.img_size/8) , int(self.img_size/16), int(self.img_size/32) , int(self.img_size/64)]
+            
+            # Follow Justin Johnson's implementation
+            c0 = tf.pad(input_img, [[0, 0], [3, 3], [3, 3], [0, 0]], "REFLECT")
+            c1 = tf.nn.relu(instance_norm(conv2d(c0, self.gfdim, kernel = 7, stride=(1,1), padding='VALID', name='g_e1_c'), 'g_e1_bn'))
+            c2 = tf.nn.relu(instance_norm(conv2d(c1, self.gfdim*2, kernel=3, stride(2,2), name='g_e2_c'), 'g_e2_bn'))
+            c3 = tf.nn.relu(instance_norm(conv2d(c2, self.gfdim*4, kernel = 3, stride = (2,2), name='g_e3_c'), 'g_e3_bn'))
+            
+            r0 = res_block2(c3 , self.gfdim * 4 , stride=(1,1) , name = 'g_r0')
+            r1 = res_block2(r0 , self.gfdim * 4 , stride=(1,1) , name = 'g_r1')
+            r2 = res_block2(r1 , self.gfdim * 4 , stride=(1,1) , name = 'g_r2')
+            r3 = res_block2(r2 , self.gfdim * 4 , stride=(1,1) , name = 'g_r3')
+            r4 = res_block2(r3 , self.gfdim * 4 , stride=(1,1) , name = 'g_r4')
+            r5 = res_block2(r4 , self.gfdim * 4 , stride=(1,1) , name = 'g_r5')
+            r6 = res_block2(r5 , self.gfdim * 4 , stride=(1,1) , name = 'g_r6')
+            r7 = res_block2(r6 , self.gfdim * 4 , stride=(1,1) , name = 'g_r7')
+            r8 = res_block2(r7 , self.gfdim * 4 , stride=(1,1) , name = 'g_r8')
+            
+            if self.deconv:
+                d0 =  deconv2d( (r8), [ batch_size, sl[1], sl[1], self.gfdim*2] , name = 'g_d0_conv') 
+                d0 =  relu( self.norm_layer(  (dec), is_train = self.isTrain, name = 'g_d0_bn') )
+                d1 =  deconv2d( (d0), [ batch_size, sl[0], sl[0], self.gfdim] , name = 'g_d1_conv') 
+                d1 =  relu( self.norm_layer(  (dec), is_train = self.isTrain, name = 'g_d1_bn') )
+                pred = tf.nn.tanh( conv2d(d1, self.out_dim , kernel = 7 , stride=(1,1), padding='VALID', name='g_pred_c'))
+                
+            else:
+                d0 =  deconv2d_resize( (r8), self.gfdim * 2 , name = 'g_d0_conv') 
+                d0 =  relu( self.norm_layer(  (dec), is_train = self.isTrain, name = 'g_d0_bn') )
+                d1 =  deconv2d( (d0),  self.gfdim , name = 'g_d1_conv') 
+                d1 =  relu( self.norm_layer(  (dec), is_train = self.isTrain, name = 'g_d1_bn') )
+                pred = tf.nn.tanh( conv2d(d1, self.out_dim , kernel = 7 , stride=(1,1), padding='VALID', name='g_pred_c'))
+                
+            
+            return pred
         
     
     def discriminator(self , input_img , patch_size = 32 ,reuse = False  ):
@@ -294,6 +337,8 @@ class pix2pix(object):
                     
                     dis = self.norm_layer( conv2d( lrelu(dis), self.dfdim * ft , stride = strides ,name= 'd_conv'+str(int(i))) , is_train = self.isTrain, name = 'd_bn' + str(int(i) ))
                 i = i + 1.0
+            
+            
             
             out = conv2d( lrelu(dis) , 1 ,stride=(1,1) , name = 'd_conv_predict')
             return tf.nn.sigmoid(out) , out
@@ -375,6 +420,14 @@ class pix2pix(object):
         start_time = time()
         
         for i in range(self.epoch):
+            
+            if self.paired:
+                random.shuffle(train_names)
+            else :
+                sample = np.random.choice( range(len(train_in_names)) , len(train_in_names) ,replace = False).tolist()
+                train_in_names = [ train_in_names[i] for i in sample]
+                train_out_names = [ train_out_names[i] for i in sample]
+            
             for j in range( int( np.ceil(total_size//self.batch_size))  ):
                 
                 #print(str(i)+" "+str(j))
@@ -395,9 +448,12 @@ class pix2pix(object):
                     input_imgs = loader.load_all_data(batch_in_names, batch_out_names , load_size = self.scale_size , crop_size = self.img_size , flip = self.flip)
 
                 
-                img_array = np.array(input_imgs)[:,:,:,None] if self.is_gray \
-                else np.array(input_imgs)
+                img_array = (np.array(input_imgs)[:,:,:,None]) if self.is_gray \
+                else (np.array(input_imgs))
                 
+                
+                
+                #print(img_array.shape())
                  
                 # optimize discriminator
                 _ , sum_d_info , dlossfake , dlossreal = self.sess.run( [d_opt , self.d_sums ,self.d_loss_fake , self.d_loss_real] , feed_dict = {self.real_pair:img_array})

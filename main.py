@@ -33,13 +33,14 @@ parser.add_argument('--mae_weight', dest='mae_weight',type=float, default=100.0,
 parser.add_argument('--gan_weight', dest='gan_weight' , type = float, default = 1.0)
 parser.add_argument('--in_dim', dest='in_dim' , type = int, default = 3)
 parser.add_argument('--out_dim', dest='out_dim', type= int, default = 3)
-parser.add_argument('--norm_method',dest='norm_method', default = 'bn' , help = 'bn/in')
+parser.add_argument('--norm_method',dest='norm_method', default = 'bn' , help = 'bn/ins')
 parser.add_argument('--en_time_unet',dest='en_time_unet',type=int, default = 8)
 parser.add_argument('--en_time_resnet', dest='en_time_resnet', type=int, default = 2)
 parser.add_argument('--deconv', dest='deconv', type=bool, default=True ,help = 'use deconvolution or resize-conv')
 parser.add_argument('--ur',dest='ur',default='u' , help = 'u or r (unet or res net)')
 parser.add_argument('--train_size', dest='train_size' , type = int ,default = 1e6 , help='maximum size of training set')
 parser.add_argument('--paired', dest='paired' , type = bool ,default = True , help='whether the in/out is paired')
+parser.add_argument('--patch_size' , dest='patch' , type = int , default = 16 , help = 'patch size of the Patch GAN')
 
 args = parser.parse_args()
 
