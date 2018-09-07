@@ -6,7 +6,7 @@ import pandas
 import os
 
 def inverse_transform(images):
-    return (images+1.)/2.
+    return 256.0 * ((images+1.)/2.)
 
 def save_imgs( imgs , size ,  path ): # save sample image in to a single large image
     out = merge(inverse_transform(imgs) , size)
@@ -40,13 +40,15 @@ def preprocess_paired_img(img , load_size = 286 , crop_size = 256 , flip = True)
     img_A = (img_A / 127.5) - 1.0
     img_B = (img_B / 127.5) - 1.0
     
-    img = np.concatenate((img_A,img_B) , asix = -1)
+    img = np.concatenate((img_A,img_B) , axis = -1)
     
     return img
 
 def merge(images, size):
+    
     h, w = images.shape[1], images.shape[2]
     img = np.zeros((h * size[0], w * size[1], 3))
+    
     for idx, image in enumerate(images):
         i = idx % size[1]
         j = idx // size[1]

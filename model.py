@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 import tensorflow as tf
 import numpy as np
-import glob
-import time
+from time import time
+from glob import glob
 import os
 import loader
 import sys
@@ -29,6 +29,7 @@ class pix2pix(object):
         self.sample_path = args.sample_path
         self.test_path = args.test_path
         self.lr = args.init_lr
+        self.flip = args.flip
         
         self.print_freq = args.print_freq
         self.save_freq = args.save_freq
@@ -87,21 +88,21 @@ class pix2pix(object):
         self.fakeB =  self.generator(self.realA , reuse = False)
     
         
-        self.fake_pair = tf.concat( [self.realA, self.fakeB ] , axis = -1)
+        self.fake_pair = tf.concat( [self.fakeB, self.realA ] , axis = -1)
         
         self.d_real , self.d_real_logits = self.discriminator(self.real_pair , patch_size = 32 , reuse=False)
         self.d_fake , self.d_fake_logits = self.discriminator(self.fake_pair , patch_size = 32 , reuse=True)
         
-        self.d_loss_real = tf.reduce_sum( tf.nn.sigmoid_cross_entropy_with_logits(logits = self.d_real_logits , labels = tf.ones_like(self.d_real) )  )
-        self.d_loss_fake = tf.reduce_sum( tf.nn.sigmoid_cross_entropy_with_logits(logits = self.d_fake_logits , labels = tf.zeros_like(self.d_fake) )  )
+        self.d_loss_real = tf.reduce_mean( tf.nn.sigmoid_cross_entropy_with_logits(logits = self.d_real_logits , labels = tf.ones_like(self.d_real) )  )
+        self.d_loss_fake = tf.reduce_mean( tf.nn.sigmoid_cross_entropy_with_logits(logits = self.d_fake_logits , labels = tf.zeros_like(self.d_fake) )  )
         
         self.d_loss = self.d_loss_real + self.d_loss_fake
         
-        self.g_loss = self.mae_weight * tf.reduce_mean( tf.abs(self.fakeB - self.realB))  \
+        self.g_loss = self.mae_weight * tf.reduce_mean( tf.abs(self.realB - self.fakeB))  \
         + self.gan_weight * tf.reduce_mean( tf.nn.sigmoid_cross_entropy_with_logits(logits= self.d_fake_logits , labels= tf.ones_like(self.d_fake) ) )
         
-        self.g_sums = []
-        self.d_sums  = []
+        g_sums = []
+        d_sums  = []
         
         self.g_loss_sum = tf.summary.scalar('g_loss' , self.g_loss)
         self.d_loss_sum = tf.summary.scalar( 'd_loss' , self.d_loss)
@@ -113,16 +114,20 @@ class pix2pix(object):
         self.d_real_sum = tf.summary.histogram( 'd real summary' , self.d_real_logits )
         self.d_fake_sum = tf.summary.histogram( 'd fake summary' , self.d_fake_logits )
         
-        self.g_sums.append(self.g_loss_sum) 
-        self.g_sums.append(self.d_loss_fake_sum)
-        self.g_sums.append(self.d_fake_sum)
-        self.g_sums.append(self.fake_b_image)
+        g_sums.append(self.g_loss_sum) 
+        g_sums.append(self.d_loss_fake_sum)
+        g_sums.append(self.d_fake_sum)
+        g_sums.append(self.fake_b_image)
         
-        self.d_sums.append(self.d_loss_sum)
-        self.d_sums.append(self.d_real_sum)
-        self.d_sums.append(self.d_fake_sum)
-        self.d_sums.append(self.d_loss_real_sum)
-        self.d_sums.append(self.d_loss_fake_sum)
+        d_sums.append(self.d_loss_sum)
+        d_sums.append(self.d_real_sum)
+        d_sums.append(self.d_fake_sum)
+        d_sums.append(self.d_loss_real_sum)
+        d_sums.append(self.d_loss_fake_sum)
+        
+        self.g_sums = tf.summary.merge(g_sums)
+        self.d_sums = tf.summary.merge(d_sums)
+        
         # or should we remove d_fake_sums here??
         
         self.saver = tf.train.Saver()
@@ -188,31 +193,31 @@ class pix2pix(object):
                 decs.append(dec)
                 dec = tf.concat( [dec , encs[6]] , axis = -1 )
             
-                dec = self.norm_layer(deconv2d(relu(dec), [batch_size , sl[5], sl[5], fdim*8] , name = 'g_d1_conv') , is_train = self.isTrain, name = 'g_d1_bn')
+                dec = self.norm_layer(deconv2d(relu(dec), [ batch_size , sl[5], sl[5], fdim*8] , name = 'g_d1_conv') , is_train = self.isTrain, name = 'g_d1_bn')
                 dec = dropout(dec)
                 decs.append(dec)
                 dec = tf.concat( [dec , encs[5]] , axis= -1 )
                 
-                dec = self.norm_layer(deconv2d(relu(dec), [batch_size, sl[4], sl[4], fdim*8] , name = 'g_d2_conv') , is_train = self.isTrain, name = 'g_d2_bn')
+                dec = self.norm_layer(deconv2d(relu(dec), [ batch_size, sl[4], sl[4], fdim*8] , name = 'g_d2_conv') , is_train = self.isTrain, name = 'g_d2_bn')
                 dec = dropout(dec)
                 decs.append(dec)
                 dec = tf.concat( [dec , encs[4]] , axis = -1 )
                 
                 # without dropout
                 
-                dec = self.norm_layer(deconv2d(relu(dec), [batch_size, sl[3], sl[3], fdim*8] , name = 'g_d3_conv') , is_train = self.isTrain, name = 'g_d3_bn')
+                dec = self.norm_layer(deconv2d(relu(dec), [ batch_size, sl[3], sl[3], fdim*8] , name = 'g_d3_conv') , is_train = self.isTrain, name = 'g_d3_bn')
                 decs.append(dec)
                 dec = tf.concat( [dec , encs[3]] , axis = -1 )
                 
-                dec = self.norm_layer(deconv2d(relu(dec), [batch_size, sl[2], sl[2], fdim*4] , name = 'g_d4_conv') , is_train = self.isTrain, name = 'g_d4_bn')
+                dec = self.norm_layer(deconv2d(relu(dec), [ batch_size, sl[2], sl[2], fdim*4] , name = 'g_d4_conv') , is_train = self.isTrain, name = 'g_d4_bn')
                 decs.append(dec)
                 dec = tf.concat( [dec , encs[2]] , axis = -1 )
                 
-                dec = self.norm_layer(deconv2d(relu(dec), [batch_size, sl[1], sl[1], fdim*2] , name = 'g_d5_conv') , is_train = self.isTrain, name = 'g_d5_bn')
+                dec = self.norm_layer(deconv2d(relu(dec), [ batch_size, sl[1], sl[1], fdim*2] , name = 'g_d5_conv') , is_train = self.isTrain, name = 'g_d5_bn')
                 decs.append(dec)
                 dec = tf.concat( [dec , encs[1]] , axis= -1 )
                 
-                dec = self.norm_layer(deconv2d(relu(dec), [batch_size, sl[0], sl[0], fdim*1] , name = 'g_d6_conv') , is_train = self.isTrain, name = 'g_d6_bn')
+                dec = self.norm_layer( deconv2d(relu(dec), [ batch_size, sl[0], sl[0], fdim*1] , name = 'g_d6_conv') , is_train = self.isTrain, name = 'g_d6_bn')
                 decs.append(dec)
                 dec = tf.concat( [dec , encs[0]] , axis = -1 )
                 
@@ -296,13 +301,16 @@ class pix2pix(object):
     def load_model(self):
         
         print('loading model...')
-        model_name = '%s_b%s_o%s'.format(self.dataset,self.batch_size,self.out_size)
-        path = os.path.join(self.model_path,model_name)
+        dir_name = '%s_b%s_o%s' % (self.dataset,self.batch_size,self.out_size)
+        path = os.path.join(self.model_path,dir_name)
         ckpt = tf.train.get_checkpoint_state(path)
-        
+        #print(ckpt)
+        #print(path)
         if ckpt and ckpt.model_checkpoint_path:
             
             ckpt_name = os.path.basename(ckpt.model_checkpoint_path)
+            print('restoring from...')
+            print(os.path.join( path , ckpt_name))
             self.saver.restore(self.sess, os.path.join( path , ckpt_name))
             return True
         else:
@@ -311,8 +319,14 @@ class pix2pix(object):
         #print('model loading finished')
         
     def save_model(self , counter):
-        model_name = '%s_b%s_o%s'.format(self.dataset, self.batch_size,self.out_size)
-        file_path = os.path.join(self.model_path,model_name)
+        
+        dir_name = '%s_b%s_o%s' % (self.dataset, self.batch_size,self.out_size)
+        checkpoint_dir = os.path.join(self.model_path , dir_name)
+
+        if not os.path.exists(checkpoint_dir):
+            os.makedirs(checkpoint_dir)
+            
+        file_path = os.path.join(checkpoint_dir ,'pix2pix.model')
         self.saver.save(self.sess, file_path , global_step = counter)
         #self.saver.save(self.sess , file_path )
         
@@ -326,7 +340,7 @@ class pix2pix(object):
         .minimize(loss = self.g_loss , var_list=self.g_vars)
         
         
-        self.global_step = tf.Variable([0] ,name='global_step' )
+        self.global_step = tf.Variable( 0  ,name='global_step' )
         
         self.global_step = tf.assign_add(self.global_step , 1)
        
@@ -353,7 +367,7 @@ class pix2pix(object):
         #self.img_data = img_data
         
         
-        if self.cont == True and self.load(self.model_path):
+        if self.cont == True and self.load_model():
             print('load model success!')
         else:
             print('start from a new model')
@@ -362,6 +376,8 @@ class pix2pix(object):
         
         for i in range(self.epoch):
             for j in range( int( np.ceil(total_size//self.batch_size))  ):
+                
+                #print(str(i)+" "+str(j))
                 
                 if self.paired:
                     batch_names = train_names[j*self.batch_size:(j+1)*self.batch_size] if not j==(np.ceil(total_size//self.batch_size)-1) \
@@ -379,21 +395,23 @@ class pix2pix(object):
                     input_imgs = loader.load_all_data(batch_in_names, batch_out_names , load_size = self.scale_size , crop_size = self.img_size , flip = self.flip)
 
                 
-                img_array = np.array(input_imgs).astype(np.float32)[:,:,:,None] if self.is_gray \
-                else np.array(input_imgs).astype(np.float32)
+                img_array = np.array(input_imgs)[:,:,:,None] if self.is_gray \
+                else np.array(input_imgs)
                 
                  
                 # optimize discriminator
                 _ , sum_d_info , dlossfake , dlossreal = self.sess.run( [d_opt , self.d_sums ,self.d_loss_fake , self.d_loss_real] , feed_dict = {self.real_pair:img_array})
                 
                 # optimize generator
-                _ , sum_g_info , gloss= self.sess.run( [g_opt , self.g_sum , self.g_loss] , feed_dict={self.real_pair:img_array})
+                _ , sum_g_info , gloss= self.sess.run( [g_opt , self.g_sums , self.g_loss] , feed_dict={self.real_pair:img_array})
                 
                 # optimize generator
-                _ , sum_g_info , gloss= self.sess.run( [g_opt , self.g_sum , self.g_loss] , feed_dict={self.real_pair:img_array})
+                _ , sum_g_info , gloss= self.sess.run( [g_opt , self.g_sums , self.g_loss] , feed_dict={self.real_pair:img_array})
                 
                 
                 step = self.sess.run( self.global_step )
+                
+                #print(step)
                 
                 self.writer.add_summary(sum_g_info ,  step )
                 self.writer.add_summary(sum_d_info ,  step )
@@ -404,7 +422,7 @@ class pix2pix(object):
                 
                 
                 print("Epoch: [%2d] [%4d/%4d] time: %4.4f, d_loss: %.8f, g_loss: %.8f" \
-                % (i, ( (total_size//self.batch_size) + 1), batch_idxs, time.time() - start_time, dlossfake + dlossreal, gloss))
+                % (i, j ,( (total_size//self.batch_size) + 1), time() - start_time, dlossfake + dlossreal, gloss))
                 
                 if np.mod(step , self.print_freq ) == 1:
                     if self.paired:
@@ -418,7 +436,7 @@ class pix2pix(object):
     
     
     
-    def sample_current_generator(path , epoch , idx, in_names , out_names = None):
+    def sample_current_generator(self, path , epoch , idx, in_names , out_names = None):
         
         sample = np.random.choice( range(len(in_names)) , self.batch_size ,replace = False).tolist()
         
@@ -430,12 +448,12 @@ class pix2pix(object):
             outs = [out_names[i] for i in sample]
             input_img =  loader.load_all_data(ins, outs , load_size = self.scale_size , crop_size = self.img_size , flip = self.flip)
             
-        img_array = np.array(input_img).astype(np.float32)[:,:,:,None] if self.is_gray \
-        else np.array(input_img).astype(np.float32)
+        img_array = np.array(input_img)[:,:,:,None] if self.is_gray \
+        else np.array(input_img)
         
         fake_imgs , g_loss , d_loss = self.sess.run( [self.fakeB,self.g_loss,self.d_loss] , feed_dict={ self.real_pair: img_array })
         
-        loader.save_imgs(fake_imgs, './{}/test_{:03d}_{:04d}.png'.format(path ,epoch, idx))
+        loader.save_imgs(fake_imgs,[self.batch_size , 1] , './{}/test_{:03d}_{:04d}.png'.format(path ,epoch, idx))
         
         print("[Sample] d_loss: {:.8f}, g_loss: {:.8f}".format(d_loss, g_loss))
     
@@ -464,11 +482,11 @@ class pix2pix(object):
         self.sess.run(init)
         
         if (self.is_gray):
-            input_imgs = np.array(input_imgs).astype(np.float32)[:, :, :, None]
+            input_imgs = np.array(input_imgs)[:, :, :, None]
         else:
-            input_imgs = np.array(input_imgs).astype(np.float32)
+            input_imgs = np.array(input_imgs)
         
-        if self.load(self.model_path):
+        if self.load_model():
             print('load model success!')
         else:
             print('there should be a model weight when testing!!')
