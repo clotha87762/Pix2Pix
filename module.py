@@ -8,7 +8,7 @@ def log2(_input):
     denominator = tf.log(tf.constant(2, dtype=numerator.dtype))
     return numerator / denominator
 
-def dropout(_input , prob = 0.5):
+def dropout(_input , prob = 0.5 ):
     return tf.nn.dropout(_input,prob)
 
 def lrelu(_input, leak = 0.2):
@@ -39,7 +39,7 @@ def instance_norm( _input, name="instance_norm" , is_train = True,epsilon=1e-5, 
 def batch_norm(_input, is_train = True,epsilon=1e-5, momentum = 0.9, name="batch_norm"):
     with tf.variable_scope(name):
         return tf.contrib.layers.batch_norm(_input, decay= 0.99,                                                                                                               
-              is_training=is_train,center= True, scale=True, 
+              is_training=is_train,center= True, scale=True, updates_collections=None, scope= name,
               reuse= False)
         
 def res_block1 (_input , num_filters, kernel = 3, stride =(2,2) , pad = 'SAME', init_std=0.05 , name ='res1'):
@@ -65,7 +65,7 @@ def res_block2 (_input , num_filters, kernel = 3, stride =(2,2) , pad = 'SAME', 
     
 
 
-def conv2d( _input , num_filter , kernel = 3 , stride=(2,2) , pad = 'SAME' , init_std = 0.05,
+def conv2d( _input , num_filter , kernel = 5 , stride=(2,2) , pad = 'SAME' , init_std = 0.05,
            name = 'conv2d'):
     
     with tf.variable_scope(name):
@@ -77,7 +77,7 @@ def conv2d( _input , num_filter , kernel = 3 , stride=(2,2) , pad = 'SAME' , ini
         return output
 
 
-def deconv2d( _input , output_shape, kernel = 3 , stride=(2,2) , pad = 'SAME' , init_std = 0.05,
+def deconv2d( _input , output_shape, kernel = 5 , stride=(2,2) , pad = 'SAME' , init_std = 0.05,
            name = 'deconv2d'):
      with tf.variable_scope(name):
         weight = tf.get_variable(name ='weight' , shape=[kernel,kernel, output_shape[-1] , _input.get_shape()[-1]] , initializer=tf.random_normal_initializer(stddev=init_std,dtype=tf.float32))
@@ -89,7 +89,7 @@ def deconv2d( _input , output_shape, kernel = 3 , stride=(2,2) , pad = 'SAME' , 
         
         return output
 
-def deconv2d_resize(_input ,num_filter , kernel = 3 , stride=(2,2) , pad = 'SAME' , init_std = 0.05, method = tf.image.ResizeMethod.NEAREST_NEIGHBOR,
+def deconv2d_resize(_input ,num_filter , kernel = 5 , stride=(2,2) , pad = 'SAME' , init_std = 0.05, method = tf.image.ResizeMethod.NEAREST_NEIGHBOR,
            name = 'deconv2d_resize'):  # use resize before a normal convolution to upsample, avoiding checkerboard effect
     with tf.variable_scope(name):
         weight = tf.get_variable(name ='weight', shape=[kernel,kernel,_input.get_shape()[-1] , num_filter], initializer=tf.truncated_normal_initializer(stddev=init_std , dtype= tf.float32))

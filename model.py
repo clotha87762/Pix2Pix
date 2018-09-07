@@ -64,6 +64,8 @@ class pix2pix(object):
         
         self.is_build = False
         
+        print(self.deconv)
+        
         #self.build()
         
     def build(self):
@@ -279,9 +281,9 @@ class pix2pix(object):
             
             # Follow Justin Johnson's implementation
             c0 = tf.pad(input_img, [[0, 0], [3, 3], [3, 3], [0, 0]], "REFLECT")
-            c1 = tf.nn.relu(instance_norm(conv2d(c0, self.gfdim, kernel = 7, stride=(1,1), padding='VALID', name='g_e1_c'), 'g_e1_bn'))
-            c2 = tf.nn.relu(instance_norm(conv2d(c1, self.gfdim*2, kernel=3, stride(2,2), name='g_e2_c'), 'g_e2_bn'))
-            c3 = tf.nn.relu(instance_norm(conv2d(c2, self.gfdim*4, kernel = 3, stride = (2,2), name='g_e3_c'), 'g_e3_bn'))
+            c1 = tf.nn.relu( self.norm_layer(conv2d(c0, self.gfdim, kernel = 7, stride=(1,1), padding='VALID' , name='g_e1_c') , is_train = self.isTrain, name = 'g_e1_bn'))
+            c2 = tf.nn.relu( self.norm_layer(conv2d(c1, self.gfdim*2, kernel=3, stride=(2,2), name='g_e2_c'),  is_train = self.isTrain, name = 'g_e2_bn'))
+            c3 = tf.nn.relu( self.norm_layer(conv2d(c2, self.gfdim*4, kernel = 3, stride = (2,2), name='g_e3_c'),  is_train = self.isTrain, name = 'g_e3_bn'))
             
             r0 = res_block2(c3 , self.gfdim * 4 , stride=(1,1) , name = 'g_r0')
             r1 = res_block2(r0 , self.gfdim * 4 , stride=(1,1) , name = 'g_r1')
@@ -334,7 +336,6 @@ class pix2pix(object):
                 else:
                     ft = 2**(int(i)) if i < 4.0 else 8
                     strides = (2,2) if i<scale_down_time-1.0 else (1,1)
-                    
                     dis = self.norm_layer( conv2d( lrelu(dis), self.dfdim * ft , stride = strides ,name= 'd_conv'+str(int(i))) , is_train = self.isTrain, name = 'd_bn' + str(int(i) ))
                 i = i + 1.0
             
