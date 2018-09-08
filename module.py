@@ -108,8 +108,18 @@ def deconv2d_resize(_input ,num_filter , kernel = 5 , stride=(2,2) , pad = 'SAME
 
 
 def dense(_input, dim, init_std=0.02 , init_bias = 0.0 , name  = 'dense' ):
+    
+    #t = tf.shape(_input)[1]
+    #u = tf.stack( [t,dim]  )
+    #print('----')
+    #print(u)
+    shape = _input.get_shape().as_list()
+
     with tf.variable_scope(name):
-        weight = tf.get_variable(name='weight', shape=[ tf.shape(_input)[-1] , dim], dtype=tf.float32,initializer=tf.truncated_normal_initializer(stddev=init_std))
+        
+        #output = tf.layers.dense(_input , dim , kernel_initializer = tf.truncated_normal_initializer(stddev=init_std) , trainable = True)
+        
+        weight = tf.get_variable(name='weight', shape= [shape[1] , dim] , dtype=tf.float32,initializer=tf.truncated_normal_initializer(stddev=init_std))
         bias = tf.get_variable(name='bias', shape=[dim], initializer=tf.constant_initializer(init_bias))
         output = tf.matmul(_input, weight)
         output = output + bias

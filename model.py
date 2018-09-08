@@ -72,7 +72,7 @@ class pix2pix(object):
         
         self.norm_layer = batch_norm if self.norm_method=='bn' else instance_norm
         
-        self.real_pair = tf.placeholder(tf.float32, shape=[ None, self.img_size, self.img_size, self.in_dim+self.out_dim ])
+        self.real_pair = tf.placeholder(tf.float32, shape=[ self.batch_size , self.img_size, self.img_size, self.in_dim+self.out_dim ])
         
         if self.dir == 'AtoB':
             self.realA = self.real_pair[:,:,:, self.in_dim:self.in_dim+self.out_dim ]
@@ -97,8 +97,8 @@ class pix2pix(object):
         self.d_real , self.d_real_logits = self.discriminator(self.real_pair , patch_size = self.patch_size , reuse=False)
         self.d_fake , self.d_fake_logits = self.discriminator(self.fake_pair , patch_size = self.patch_size , reuse=True)
         
-        self.d_loss_real = tf.reduce_mean( tf.nn.sigmoid_cross_entropy_with_logits(logits = self.d_real_logits , labels = tf.ones_like(self.d_real) )  )
-        self.d_loss_fake = tf.reduce_mean( tf.nn.sigmoid_cross_entropy_with_logits(logits = self.d_fake_logits , labels = tf.zeros_like(self.d_fake) )  )
+        self.d_loss_real = tf.reduce_mean( tf.nn.sigmoid_cross_entropy_with_logits(logits = self.d_real_logits , labels = tf.ones_like(self.d_real_logits) )  )
+        self.d_loss_fake = tf.reduce_mean( tf.nn.sigmoid_cross_entropy_with_logits(logits = self.d_fake_logits , labels = tf.zeros_like(self.d_fake_logits) )  )
         
         self.d_loss = self.d_loss_real + self.d_loss_fake
         
@@ -108,11 +108,11 @@ class pix2pix(object):
         g_sums = []
         d_sums  = []
         
-        self.g_loss_sum = tf.summary.scalar('g_loss' , self.g_loss)
-        self.d_loss_sum = tf.summary.scalar( 'd_loss' , self.d_loss)
+        self.g_loss_sum = tf.summary.scalar('g_loss' , tf.reduce_mean(self.g_loss))
+        self.d_loss_sum = tf.summary.scalar( 'd_loss' , tf.reduce_mean(self.d_loss))
         
-        self.d_loss_real_sum = tf.summary.scalar("d_loss_real", self.d_loss_real)
-        self.d_loss_fake_sum = tf.summary.scalar("d_loss_fake", self.d_loss_fake)
+        self.d_loss_real_sum = tf.summary.scalar("d_loss_real", tf.reduce_mean(self.d_loss_real))
+        self.d_loss_fake_sum = tf.summary.scalar("d_loss_fake", tf.reduce_mean(self.d_loss_fake))
         
         self.fake_b_image = tf.summary.image('fake_image' , self.fakeB)
         self.d_real_sum = tf.summary.histogram( 'd real summary' , self.d_real_logits )
@@ -167,7 +167,7 @@ class pix2pix(object):
             sl =[int(self.img_size/2) , int(self.img_size/4) , int(self.img_size/8) , int(self.img_size/16), int(self.img_size/32) , int(self.img_size/64), int(self.img_size/128), int(self.img_size/256)]
             
             
-            enc = self.norm_layer(conv2d(input_img, fdim, name = 'g_e0_conv') , is_train = self.isTrain, name = 'g_e0_bn')
+            enc = conv2d(input_img, fdim, name = 'g_e0_conv')
             encs.append(enc)
             
             enc = self.norm_layer(conv2d( lrelu(enc), fdim*2 , name = 'g_e1_conv') , is_train = self.isTrain, name = 'g_e1_bn')
@@ -337,11 +337,13 @@ class pix2pix(object):
                     ft = 2**(int(i)) if i < 4.0 else 8
                     strides = (2,2) if i<scale_down_time-1.0 else (1,1)
                     dis = self.norm_layer( conv2d( lrelu(dis), self.dfdim * ft , stride = strides ,name= 'd_conv'+str(int(i))) , is_train = self.isTrain, name = 'd_bn' + str(int(i) ))
+                    print(self.dfdim*ft)
                 i = i + 1.0
             
-            
-            
-            out = conv2d( lrelu(dis) , 1 ,stride=(1,1) , name = 'd_conv_predict')
+            dis = lrelu(dis)
+            out = dense(tf.reshape(dis, [self.batch_size, -1]), 1, name = 'd_lin')
+            #out = conv2d( lrelu(dis) , 1 ,stride=(1,1) , name = 'd_conv_predict')
+            #print(out.get_shape())
             return tf.nn.sigmoid(out) , out
         
     def load_model(self):
@@ -479,7 +481,7 @@ class pix2pix(object):
                 
                 
                 print("Epoch: [%2d] [%4d/%4d] time: %4.4f, d_loss: %.8f, g_loss: %.8f" \
-                % (i, j ,( (total_size//self.batch_size) + 1), time() - start_time, dlossfake + dlossreal, gloss))
+                % (i, j ,( (total_size//self.batch_size) + 1), time() - start_time, np.mean(dlossfake) + np.mean(dlossreal), np.mean(gloss)))
                 
                 if np.mod(step , self.print_freq ) == 1:
                     if self.paired:
@@ -512,7 +514,7 @@ class pix2pix(object):
         
         loader.save_imgs(fake_imgs,[self.batch_size , 1] , './{}/test_{:03d}_{:04d}.png'.format(path ,epoch, idx))
         
-        print("[Sample] d_loss: {:.8f}, g_loss: {:.8f}".format(d_loss, g_loss))
+        print("[Sample] d_loss: {:.8f}, g_loss: {:.8f}".format(np.mean(d_loss), np.mean( g_loss)))
     
     def test(self):
         
