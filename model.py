@@ -269,7 +269,7 @@ class pix2pix(object):
           
         
     def generator_resnet(self , input_img , reuse = False ):
-        with tf.variable_sope('generator'):
+        with tf.variable_scope('generator'):
             if reuse:
                 tf.get_variable_scope().reuse_variables()
             else :
@@ -281,7 +281,7 @@ class pix2pix(object):
             
             # Follow Justin Johnson's implementation
             c0 = tf.pad(input_img, [[0, 0], [3, 3], [3, 3], [0, 0]], "REFLECT")
-            c1 = tf.nn.relu( self.norm_layer(conv2d(c0, self.gfdim, kernel = 7, stride=(1,1), padding='VALID' , name='g_e1_c') , is_train = self.isTrain, name = 'g_e1_bn'))
+            c1 = tf.nn.relu( self.norm_layer(conv2d(c0, self.gfdim, kernel = 7, stride=(1,1), pad='VALID' , name='g_e1_c') , is_train = self.isTrain, name = 'g_e1_bn'))
             c2 = tf.nn.relu( self.norm_layer(conv2d(c1, self.gfdim*2, kernel=3, stride=(2,2), name='g_e2_c'),  is_train = self.isTrain, name = 'g_e2_bn'))
             c3 = tf.nn.relu( self.norm_layer(conv2d(c2, self.gfdim*4, kernel = 3, stride = (2,2), name='g_e3_c'),  is_train = self.isTrain, name = 'g_e3_bn'))
             
@@ -297,17 +297,19 @@ class pix2pix(object):
             
             if self.deconv:
                 d0 =  deconv2d( (r8), [ batch_size, sl[1], sl[1], self.gfdim*2] , name = 'g_d0_conv') 
-                d0 =  relu( self.norm_layer(  (dec), is_train = self.isTrain, name = 'g_d0_bn') )
+                d0 =  relu( self.norm_layer(  (d0), is_train = self.isTrain, name = 'g_d0_bn') )
                 d1 =  deconv2d( (d0), [ batch_size, sl[0], sl[0], self.gfdim] , name = 'g_d1_conv') 
-                d1 =  relu( self.norm_layer(  (dec), is_train = self.isTrain, name = 'g_d1_bn') )
-                pred = tf.nn.tanh( conv2d(d1, self.out_dim , kernel = 7 , stride=(1,1), padding='VALID', name='g_pred_c'))
+                d1 =  relu( self.norm_layer(  (d1), is_train = self.isTrain, name = 'g_d1_bn') )
+                d1 = tf.pad(d1, [[0, 0], [3, 3], [3, 3], [0, 0]], "REFLECT")
+                pred = tf.nn.tanh( conv2d(d1, self.out_dim , kernel = 7 , stride=(1,1), pad='VALID', name='g_pred_c'))
                 
             else:
                 d0 =  deconv2d_resize( (r8), self.gfdim * 2 , name = 'g_d0_conv') 
-                d0 =  relu( self.norm_layer(  (dec), is_train = self.isTrain, name = 'g_d0_bn') )
+                d0 =  relu( self.norm_layer(  (d0), is_train = self.isTrain, name = 'g_d0_bn') )
                 d1 =  deconv2d( (d0),  self.gfdim , name = 'g_d1_conv') 
-                d1 =  relu( self.norm_layer(  (dec), is_train = self.isTrain, name = 'g_d1_bn') )
-                pred = tf.nn.tanh( conv2d(d1, self.out_dim , kernel = 7 , stride=(1,1), padding='VALID', name='g_pred_c'))
+                d1 =  relu( self.norm_layer(  (d1), is_train = self.isTrain, name = 'g_d1_bn') )
+                d1 = tf.pad(d1, [[0, 0], [3, 3], [3, 3], [0, 0]], "REFLECT")
+                pred = tf.nn.tanh( conv2d(d1, self.out_dim , kernel = 7 , stride=(1,1), pad='VALID', name='g_pred_c'))
                 
             
             return pred
@@ -341,9 +343,9 @@ class pix2pix(object):
                     print(strides)
                 i = i + 1.0
             
-            dis = lrelu(dis)
-            out = dense(tf.reshape(dis, [self.batch_size, -1]), 1, name = 'd_lin')
-            #out = conv2d( lrelu(dis) , 1 ,stride=(1,1) , name = 'd_conv_predict')
+            #dis = lrelu(dis)
+            #out = dense(tf.reshape(dis, [self.batch_size, -1]), 1, name = 'd_lin')
+            out = conv2d( lrelu(dis) , 1 ,stride=(1,1) , name = 'd_conv_predict')
             #print(out.get_shape())
             return tf.nn.sigmoid(out) , out
         

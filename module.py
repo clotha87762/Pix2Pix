@@ -56,9 +56,9 @@ def res_block2 (_input , num_filters, kernel = 3, stride =(2,2) , pad = 'SAME', 
     with tf.variable_scope(name):
         p = int((kernel - 1) / 2)
         y = tf.pad(_input, [[0, 0], [p, p], [p, p], [0, 0]], "REFLECT")
-        y = instance_norm(conv2d(y, num_filters, kernel, stride, pad=pad, name=name+'_c1'), name+'_bn1')
+        y = instance_norm(conv2d(y, num_filters, kernel, stride, pad="VALID", name=name+'_c1'), name+'_bn1')
         y = tf.pad(relu(y), [[0, 0], [p, p], [p, p], [0, 0]], "REFLECT")
-        y = instance_norm(conv2d(y, num_filters, kernel, stride, pad = pad , name=name+'_c2'), name+'_bn2')
+        y = instance_norm(conv2d(y, num_filters, kernel, stride, pad = "VALID" , name=name+'_c2'), name+'_bn2')
         return y + _input # identity addition
 
 

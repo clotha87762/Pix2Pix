@@ -58,19 +58,19 @@ def main(_):
     
    
     with tf.Session() as sess:
-               
-        model = pix2pix(sess, args)
-        model.build()
+                       
+            model = pix2pix(sess, args)
+            model.build()
          
-        if args.phase == 'train':
-            model.train()
-        else :
-            model.test()
+            if args.phase == 'train':
+                model.train()
+            else :
+                model.test()
     
         
 if __name__ == "__main__" :
     tf.app.run()
-    
+         
     
     
     
