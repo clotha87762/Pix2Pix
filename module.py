@@ -13,15 +13,15 @@ def dropout(_input , prob = 0.5 ):
 
 def lrelu(_input, leak = 0.2):
     lrelu =  tf.maximum(_input, _input*leak)
-    nan_to_zero = tf.where(tf.equal(lrelu, lrelu), lrelu, tf.zeros_like(lrelu))
-    return nan_to_zero
+    #nan_to_zero = tf.where(tf.equal(lrelu, lrelu), lrelu, tf.zeros_like(lrelu))
+    return lrelu#nan_to_zero
 
 
 def relu(_input):
     relu = tf.nn.relu(_input)
     
-    nan_to_zero = tf.where(tf.equal(relu, relu), relu, tf.zeros_like(relu))
-    return nan_to_zero
+    #nan_to_zero = tf.where(tf.equal(relu, relu), relu, tf.zeros_like(relu))
+    return relu#nan_to_zero
 
 
 def instance_norm( _input, name="instance_norm" , is_train = True,epsilon=1e-5, momentum = 0.9):

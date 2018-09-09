@@ -92,13 +92,14 @@ class pix2pix(object):
         self.fakeB =  self.generator(self.realA , reuse = False)
     
         
-        self.fake_pair = tf.concat( [self.fakeB, self.realA ] , axis = -1)
+        self.fake_pair = tf.concat( [self.realA , self.fakeB] , axis = -1)
+        self.real_AB_pair = tf.concat( [ self.realA , self.realB ] , axis = -1)
         
-        self.d_real , self.d_real_logits = self.discriminator(self.real_pair , patch_size = self.patch_size , reuse=False)
+        self.d_real , self.d_real_logits = self.discriminator(self.real_AB_pair , patch_size = self.patch_size , reuse=False)
         self.d_fake , self.d_fake_logits = self.discriminator(self.fake_pair , patch_size = self.patch_size , reuse=True)
         
-        self.d_loss_real = tf.reduce_mean( tf.nn.sigmoid_cross_entropy_with_logits(logits = self.d_real_logits , labels = tf.ones_like(self.d_real_logits) )  )
-        self.d_loss_fake = tf.reduce_mean( tf.nn.sigmoid_cross_entropy_with_logits(logits = self.d_fake_logits , labels = tf.zeros_like(self.d_fake_logits) )  )
+        self.d_loss_real = ( tf.nn.sigmoid_cross_entropy_with_logits(logits = self.d_real_logits , labels = tf.ones_like(self.d_real_logits) )  )
+        self.d_loss_fake = ( tf.nn.sigmoid_cross_entropy_with_logits(logits = self.d_fake_logits , labels = tf.zeros_like(self.d_fake_logits) )  )
         
         self.d_loss = self.d_loss_real + self.d_loss_fake
         
@@ -306,7 +307,7 @@ class pix2pix(object):
             else:
                 d0 =  deconv2d_resize( (r8), self.gfdim * 2 , name = 'g_d0_conv') 
                 d0 =  relu( self.norm_layer(  (d0), is_train = self.isTrain, name = 'g_d0_bn') )
-                d1 =  deconv2d( (d0),  self.gfdim , name = 'g_d1_conv') 
+                d1 =  deconv2d_resize( (d0),  self.gfdim , name = 'g_d1_conv') 
                 d1 =  relu( self.norm_layer(  (d1), is_train = self.isTrain, name = 'g_d1_bn') )
                 d1 = tf.pad(d1, [[0, 0], [3, 3], [3, 3], [0, 0]], "REFLECT")
                 pred = tf.nn.tanh( conv2d(d1, self.out_dim , kernel = 7 , stride=(1,1), pad='VALID', name='g_pred_c'))
@@ -429,7 +430,7 @@ class pix2pix(object):
             
             if self.paired:
                 
-                #random.shuffle(train_names)
+                random.shuffle(train_names)
                 pass
             else :
                 sample = np.random.choice( range(len(train_in_names)) , len(train_in_names) ,replace = False).tolist()
@@ -467,7 +468,7 @@ class pix2pix(object):
                 _ , sum_d_info  = self.sess.run( [d_opt , self.d_sums ] , feed_dict = {self.real_pair:img_array})
                 
                 # optimize generator
-                _ , sum_g_info = self.sess.run( [g_opt , self.g_sums ] , feed_dict={self.real_pair:img_array})
+                #_ , sum_g_info = self.sess.run( [g_opt , self.g_sums ] , feed_dict={self.real_pair:img_array})
                 
                 
                 

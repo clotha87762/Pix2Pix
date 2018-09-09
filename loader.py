@@ -39,6 +39,8 @@ def preprocess_paired_img(img , load_size = 286 , crop_size = 256 , flip = True 
             img_A = np.fliplr(img_A)
             img_B = np.fliplr(img_B)
     else :
+        w = int(img.shape[1])
+        w2 = int(w/2)
         img_A = img[:, 0:w2].astype(np.float32)
         img_B = img[:, w2:w].astype(np.float32)
         img_A = scipy.misc.imresize(img_A, (crop_size , crop_size) )
