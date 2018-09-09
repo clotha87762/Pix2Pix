@@ -98,8 +98,8 @@ class pix2pix(object):
         self.d_real , self.d_real_logits = self.discriminator(self.real_AB_pair , patch_size = self.patch_size , reuse=False)
         self.d_fake , self.d_fake_logits = self.discriminator(self.fake_pair , patch_size = self.patch_size , reuse=True)
         
-        self.d_loss_real = ( tf.nn.sigmoid_cross_entropy_with_logits(logits = self.d_real_logits , labels = tf.ones_like(self.d_real_logits) )  )
-        self.d_loss_fake = ( tf.nn.sigmoid_cross_entropy_with_logits(logits = self.d_fake_logits , labels = tf.zeros_like(self.d_fake_logits) )  )
+        self.d_loss_real = tf.reduce_mean( tf.nn.sigmoid_cross_entropy_with_logits(logits = self.d_real_logits , labels = tf.ones_like(self.d_real_logits) )  )
+        self.d_loss_fake = tf.reduce_mean( tf.nn.sigmoid_cross_entropy_with_logits(logits = self.d_fake_logits , labels = tf.zeros_like(self.d_fake_logits) )  )
         
         self.d_loss = self.d_loss_real + self.d_loss_fake
         
