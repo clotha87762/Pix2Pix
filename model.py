@@ -338,6 +338,7 @@ class pix2pix(object):
                     strides = (2,2) if i<scale_down_time-1.0 else (1,1)
                     dis = self.norm_layer( conv2d( lrelu(dis), self.dfdim * ft , stride = strides ,name= 'd_conv'+str(int(i))) , is_train = self.isTrain, name = 'd_bn' + str(int(i) ))
                     print(self.dfdim*ft)
+                    print(strides)
                 i = i + 1.0
             
             dis = lrelu(dis)
@@ -388,7 +389,7 @@ class pix2pix(object):
         .minimize(loss = self.g_loss , var_list=self.g_vars)
         
         
-        self.global_step = tf.Variable( 0  ,name='global_step' )
+        self.global_step = tf.Variable( 0  ,name='global_step'  , trainable = False)
         
         self.global_step = tf.assign_add(self.global_step , 1)
        
@@ -425,7 +426,9 @@ class pix2pix(object):
         for i in range(self.epoch):
             
             if self.paired:
-                random.shuffle(train_names)
+                
+                #random.shuffle(train_names)
+                pass
             else :
                 sample = np.random.choice( range(len(train_in_names)) , len(train_in_names) ,replace = False).tolist()
                 train_in_names = [ train_in_names[i] for i in sample]
@@ -459,14 +462,19 @@ class pix2pix(object):
                 #print(img_array.shape())
                  
                 # optimize discriminator
-                _ , sum_d_info , dlossfake , dlossreal = self.sess.run( [d_opt , self.d_sums ,self.d_loss_fake , self.d_loss_real] , feed_dict = {self.real_pair:img_array})
+                _ , sum_d_info  = self.sess.run( [d_opt , self.d_sums ] , feed_dict = {self.real_pair:img_array})
                 
                 # optimize generator
-                _ , sum_g_info , gloss= self.sess.run( [g_opt , self.g_sums , self.g_loss] , feed_dict={self.real_pair:img_array})
+                _ , sum_g_info = self.sess.run( [g_opt , self.g_sums ] , feed_dict={self.real_pair:img_array})
+                
+                
                 
                 # optimize generator
-                _ , sum_g_info , gloss= self.sess.run( [g_opt , self.g_sums , self.g_loss] , feed_dict={self.real_pair:img_array})
+                _ , sum_g_info = self.sess.run( [g_opt , self.g_sums ] , feed_dict={self.real_pair:img_array})
                 
+                gloss = self.g_loss.eval({self.real_pair: img_array})
+                dlossreal = self.d_loss_real.eval({self.real_pair: img_array})
+                dlossfake = self.d_loss_fake.eval({self.real_pair: img_array})
                 
                 step = self.sess.run( self.global_step )
                 
@@ -519,7 +527,8 @@ class pix2pix(object):
     def test(self):
         
         assert self.is_build
-
+        
+        self.global_step = tf.Variable( 0  ,name='global_step'  , trainable = False)
         
         if self.paired:
             test_names = glob('./datasets/{}/test/*.jpg'.format(self.dataset))
@@ -535,15 +544,13 @@ class pix2pix(object):
             test_out_names = [x for (y, x) in sorted(zip(n, test_out_names))]
             input_imgs = loader.load_all_data(test_in_names, test_out_names , load_size = self.scale_size, crop_size=self.img_size , flip = False)
         
-        input_imgs = [input_imgs[i:i+self.batch_size] for i in xrange(0, len(input_imgs), self.batch_size)]
+        input_imgs = [input_imgs[i:i+self.batch_size] for i in range(0, len(input_imgs), self.batch_size)]
+        
         
         init = tf.global_variables_initializer()
         self.sess.run(init)
         
-        if (self.is_gray):
-            input_imgs = np.array(input_imgs)[:, :, :, None]
-        else:
-            input_imgs = np.array(input_imgs)
+       
         
         if self.load_model():
             print('load model success!')
@@ -552,8 +559,16 @@ class pix2pix(object):
             sys.exit()
         
         for i , sample in enumerate(input_imgs):
-             output = self.sess.run( [self.fakeB] , feed_dict = {self.real_pair : sample})
-             loader.save_imgs(output , [self.batch_size , 1] , './{}/test_{:04d}.png'.format(self.test_path , i))
+            
+            if self.is_gray:
+                sample = np.array(sample)[:, :, :, None]
+            else:
+                sample = np.array(sample)
+            
+                
+            output = self.sess.run( self.fakeB , feed_dict = {self.real_pair : sample})
+            
+            loader.save_imgs(output , [self.batch_size , 1] , './{}/test_{:04d}.png'.format(self.test_path , i))
         
     
             

@@ -4,37 +4,46 @@ import numpy as np
 import cv2
 import pandas
 import os
+import scipy.misc
 
 def inverse_transform(images):
-    return 256.0 * ((images+1.)/2.)
+    return ((images+1.)/2.)
 
 def save_imgs( imgs , size ,  path ): # save sample image in to a single large image
     out = merge(inverse_transform(imgs) , size)
-    cv2.imwrite(path , out)
+    scipy.misc.imsave(path,out)
+    #cv2.imwrite(path , out)
 
 def save_img(img, path):
-    cv2.imwrite(path, img)
+    scipy.misc.imsave(path,out)
 
 
 def preprocess_img(img , load_size = 286 , crop_size = 256):
     pass
 
-def preprocess_paired_img(img , load_size = 286 , crop_size = 256 , flip = True):
-    w = int(img.shape[1])
-    w2 = int(w/2)
-    img_A = img[:, 0:w2].astype(np.float32)
-    img_B = img[:, w2:w].astype(np.float32)
+def preprocess_paired_img(img , load_size = 286 , crop_size = 256 , flip = True , isTest = False):
     
-    img_A = cv2.resize(img_A, (load_size , load_size) , cv2.INTER_CUBIC)
-    img_B = cv2.resize(img_B, (load_size , load_size) , cv2.INTER_CUBIC)
-    
-    res = load_size-crop_size if load_size > crop_size else 0
-    img_A = img_A[int(res/2):int(res/2)+crop_size ,  int(res/2):int(res/2)+crop_size]
-    img_B = img_B[int(res/2):int(res/2)+crop_size , int(res/2):int(res/2)+crop_size]
-    
-    if flip and np.random.random() > 0.5:
-        img_A = np.fliplr(img_A)
-        img_B = np.fliplr(img_B)
+    if not isTest:
+        w = int(img.shape[1])
+        w2 = int(w/2)
+        img_A = img[:, 0:w2].astype(np.float32)
+        img_B = img[:, w2:w].astype(np.float32)
+        
+        img_A = scipy.misc.imresize(img_A, (load_size , load_size) )
+        img_B = scipy.misc.imresize(img_B, (load_size , load_size) )
+        
+        res = load_size-crop_size if load_size > crop_size else 0
+        img_A = img_A[int(res/2):int(res/2)+crop_size ,  int(res/2):int(res/2)+crop_size]
+        img_B = img_B[int(res/2):int(res/2)+crop_size , int(res/2):int(res/2)+crop_size]
+        
+        if flip and np.random.random() > 0.5:
+            img_A = np.fliplr(img_A)
+            img_B = np.fliplr(img_B)
+    else :
+        img_A = img[:, 0:w2].astype(np.float32)
+        img_B = img[:, w2:w].astype(np.float32)
+        img_A = scipy.misc.imresize(img_A, (crop_size , crop_size) )
+        img_B = scipy.misc.imresize(img_B, (crop_size , crop_size) )
 
 
     img_A = (img_A / 127.5) - 1.0
@@ -74,11 +83,12 @@ def load_all_data(batch_in_names, batch_out_names , load_size = 286 , crop_size 
 
 
 
-def load_all_data_pair(datas , load_size = 286 , crop_size = 256 , flip = True): # facedes
+def load_all_data_pair(datas , load_size = 286 , crop_size = 256 , flip = True , isTest = False ): # facedes
     imgs = []
     for name in datas:
-        img = cv2.imread(name)
-        img =  img.astype(np.float32)
+        #img = cv2.imread(name)
+        img = scipy.misc.imread(name)
+        img =  img.astype(np.float)
         imgs.append(preprocess_paired_img(img))
     
     return imgs

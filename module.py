@@ -38,8 +38,8 @@ def instance_norm( _input, name="instance_norm" , is_train = True,epsilon=1e-5, 
     
 def batch_norm(_input, is_train = True,epsilon=1e-5, momentum = 0.9, name="batch_norm"):
     with tf.variable_scope(name):
-        return tf.contrib.layers.batch_norm(_input, decay= 0.99,                                                                                                               
-              is_training=is_train,center= True, scale=True, updates_collections=None, scope= name,
+        return tf.contrib.layers.batch_norm(_input, decay= momentum,                                                                                                               
+              is_training=is_train, scale=True, updates_collections=None, scope= name, epsilon = epsilon,
               reuse= False)
         
 def res_block1 (_input , num_filters, kernel = 3, stride =(2,2) , pad = 'SAME', init_std=0.05 , name ='res1'):

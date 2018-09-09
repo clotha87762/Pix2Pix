@@ -40,7 +40,7 @@ parser.add_argument('--deconv', dest='deconv', type=bool, default=True ,help = '
 parser.add_argument('--ur',dest='ur',default='u' , help = 'u or r (unet or res net)')
 parser.add_argument('--train_size', dest='train_size' , type = int ,default = 1e6 , help='maximum size of training set')
 parser.add_argument('--paired', dest='paired' , type = bool ,default = True , help='whether the in/out is paired')
-parser.add_argument('--patch_size' , dest='patch' , type = int , default = 16 , help = 'patch size of the Patch GAN')
+parser.add_argument('--patch_size' , dest='patch' , type = int , default = 32 , help = 'patch size of the Patch GAN')
 
 args = parser.parse_args()
 
