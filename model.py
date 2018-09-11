@@ -75,8 +75,12 @@ class pix2pix(object):
         self.real_pair = tf.placeholder(tf.float32, shape=[ self.batch_size , self.img_size, self.img_size, self.in_dim+self.out_dim ])
         
         if self.dir == 'AtoB':
-            self.realA = self.real_pair[:,:,:, self.in_dim:self.in_dim+self.out_dim ]
-            self.realB = self.real_pair[:,:,:, :self.in_dim]
+            if self.dataset == 'facades':
+                self.realA = self.real_pair[:,:,:, self.in_dim:self.in_dim+self.out_dim ]
+                self.realB = self.real_pair[:,:,:, :self.in_dim]
+            else:
+                self.realB = self.real_pair[:,:,:, self.in_dim:self.in_dim+self.out_dim ]
+                self.realA = self.real_pair[:,:,:, :self.in_dim]
         else :
             self.realB = self.real_pair[:,:,:, self.in_dim:self.in_dim+self.out_dim ]
             self.realA = self.real_pair[:,:,:, :self.in_dim]
@@ -442,8 +446,11 @@ class pix2pix(object):
                 #print(str(i)+" "+str(j))
                 
                 if self.paired:
-                    batch_names = train_names[j*self.batch_size:(j+1)*self.batch_size] if not j==(np.ceil(total_size//self.batch_size)-1) \
+                    batch_names = train_names[j*self.batch_size:(j+1)*self.batch_size] if not j>=(np.ceil(total_size//self.batch_size)-1) \
                     else train_names[j*self.batch_size:]
+                    
+                    if not len(batch_names) == self.batch_size:
+                        continue
                     
                     input_imgs = loader.load_all_data_pair(batch_names , load_size = self.scale_size , crop_size = self.img_size , flip = self.flip)
 
@@ -467,13 +474,21 @@ class pix2pix(object):
                 # optimize discriminator
                 _ , sum_d_info  = self.sess.run( [d_opt , self.d_sums ] , feed_dict = {self.real_pair:img_array})
                 
-                # optimize generator
-                #_ , sum_g_info = self.sess.run( [g_opt , self.g_sums ] , feed_dict={self.real_pair:img_array})
+                # _ , sum_d_info  = self.sess.run( [d_opt , self.d_sums ] , feed_dict = {self.real_pair:img_array})
                 
+                #_ , sum_d_info  = self.sess.run( [d_opt , self.d_sums ] , feed_dict = {self.real_pair:img_array})
+                #
                 
-                
+                # update generator twice iff the last layer of discriminator is dense (which is too powerful) instead of patch gan
                 # optimize generator
                 _ , sum_g_info = self.sess.run( [g_opt , self.g_sums ] , feed_dict={self.real_pair:img_array})
+                
+                
+                
+                # optimize generator
+                #_ , sum_g_info = self.sess.run( [g_opt , self.g_sums ] , feed_dict={self.real_pair:img_array})
+                #_ , sum_g_info = self.sess.run( [g_opt , self.g_sums ] , feed_dict={self.real_pair:img_array})
+                #_ , sum_g_info = self.sess.run( [g_opt , self.g_sums ] , feed_dict={self.real_pair:img_array})
                 
                 gloss = self.g_loss.eval({self.real_pair: img_array})
                 dlossreal = self.d_loss_real.eval({self.real_pair: img_array})
@@ -496,9 +511,9 @@ class pix2pix(object):
                 
                 if np.mod(step , self.print_freq ) == 1:
                     if self.paired:
-                        self.sample_current_generator( self.sample_path, i , j , val_names)
+                        self.sample_current_generator( self.sample_path, step , j , val_names)
                     else:
-                        self.sample_current_generator( self.sample_path, i, j, val_in_names , val_out_names)
+                        self.sample_current_generator( self.sample_path, step , j , val_in_names , val_out_names)
                 
                 if np.mod(step , self.save_freq ) == 2:
                     self.save_model(step)
